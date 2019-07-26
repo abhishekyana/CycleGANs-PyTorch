@@ -7,7 +7,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from models import Generator, Discriminator
-from utils import ReplayBuffer, LambdaLR, Logger, weights_init_normal
+from utils import ReplayBuffer, Logger, weights_init_normal
 
 from configure import options #Edit this file to control the parameters once, without everytime pasting huge run command for every run.
 
