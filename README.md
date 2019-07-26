@@ -2,7 +2,10 @@
 Py-Torch implementation of [CycleGAN](https://arxiv.org/pdf/1703.10593.pdf).
 * You can find more about this project in my [blog here](http://blog.abhishekyana.ml/implement-your-own-young-to-old-age-converter-app-in-pytorch-using-cyclegans/)
 ### RESULTS FIRST: Young to Old converter
-[img1.jpg](./results/A/0166.png)
+![img1.jpg](./results/A/0166.png)
+![img2.jpg](./results/A/0168.png)
+![img3.jpg](./results/A/0145.png)
+![img4.jpg](./results/A/0255.png)
 ### IF you want to replicate these results may be on different dataset. Read More..
 1. Clone the repository:
 ```
