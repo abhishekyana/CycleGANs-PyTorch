@@ -1,87 +1,70 @@
 import os
-import sys
 import torch
-import argparse
+from models import Generator
+from datasets import AnBDataset
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
+from configure import testoptions as options
 from torchvision.utils import make_grid, save_image
-from models import Generator
-from datasets import ImageDataset
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--batchSize', type=int, default=1, help='size of the batches')
-parser.add_argument('--dataroot', type=str, default='young2old', help='root directory of the dataset')
-parser.add_argument('--input_nc', type=int, default=3, help='number of channels of input data')
-parser.add_argument('--output_nc', type=int, default=3, help='number of channels of output data')
-parser.add_argument('--size', type=int, default=256, help='size of the data (squared assumed)')
-parser.add_argument('--cuda', action='store_true', help='use GPU computation')
-parser.add_argument('--n_cpu', type=int, default=8, help='number of cpu threads to use during batch generation')
-parser.add_argument('--generator_A2B', type=str, default='output/netG_A2B.pth', help='A2B generator checkpoint file')
-parser.add_argument('--generator_B2A', type=str, default='output/netG_B2A.pth', help='B2A generator checkpoint file')
-opt = parser.parse_args()
-print(opt)
 
-if torch.cuda.is_available() and not opt.cuda:
-    print("WARNING: You have a CUDA device, so you should probably run with --cuda")
+inH, inW, inC = options["inResolution"]
+outH, outW, outC = options["outResolution"]
 
-###### Definition of variables ######
-# Networks
-netG_A2B = Generator(opt.input_nc, opt.output_nc)
-netG_B2A = Generator(opt.output_nc, opt.input_nc)
+if torch.cuda.is_available():
+	options["cuda"]=True
 
-if opt.cuda:
-    netG_A2B.cuda()
-    netG_B2A.cuda()
+def loadModel(options):
+	GEN_A2B = Generator(inC, outC)
+	GEN_B2A = Generator(outC, inC)
+	if options["cuda"]:
+		GEN_A2B.cuda()
+		GEN_B2A.cuda()
+	GEN_A2B.load_state_dict(torch.load(options["GEN_A2B"]))
+	GEN_B2A.load_state_dict(torch.load(options["GEN_B2A"]))
+	GEN_A2B.eval()
+	GEN_B2A.eval()
+	return GEN_A2B, GEN_B2A
 
-# Load state dicts
-netG_A2B.load_state_dict(torch.load(opt.generator_A2B))
-netG_B2A.load_state_dict(torch.load(opt.generator_B2A))
+def loadData(options):
+	ApplyTransforms = [ transforms.ToTensor(),
+                		transforms.Normalize((1/2,)*3, (1/2,)*3) ]
+	dataloader = DataLoader(ImageDataset(options["datapath"], transforms_arg=ApplyTransforms, mode='test'), 
+                        	batch_size=options["batchsize"], shuffle=False, num_workers=options["nThreads"])
+	return dataloader
 
-# Set model's test mode
-netG_A2B.eval()
-netG_B2A.eval()
+def tester(options):
+	GEN_A2B, GEN_B2A = loadModel(options)
+	dataloader = loadData(options)
 
-# Inputs & targets memory allocation
-Tensor = torch.cuda.FloatTensor if opt.cuda else torch.Tensor
-input_A = Tensor(opt.batchSize, opt.input_nc, opt.size, opt.size)
-input_B = Tensor(opt.batchSize, opt.output_nc, opt.size, opt.size)
+	#Create placeholders for the images
+	if options["cuda"]:
+		Tensor = torch.cuda.FloatTensor
+	else:
+		Tensor = torch.Tensor
+	imageA = Tensor(batchsize, inC, inH, inW)
+	imageB = Tensor(batchsize, outC, outH, outW)
 
-# Dataset loader
-transforms_ = [ transforms.ToTensor(),
-                transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5)) ]
-dataloader = DataLoader(ImageDataset(opt.dataroot, transforms_=transforms_, mode='test'), 
-                        batch_size=opt.batchSize, shuffle=False, num_workers=opt.n_cpu)
-###################################
+	if not os.path.exists(f'{options["outputpath"]}/A'):
+	    os.makedirs(f'{options["outputpath"]}/A')
+	if not os.path.exists(f'{options["outputpath"]}/B'):
+	    os.makedirs(f'{options["outputpath"]}/B')
+	
+	for batch_id, batch_data in enumerate(dataloader):
+		realA = Variable(imageA.copy_(batch_data['A']))
+		realB = Variable(imageB.copy_(batch_data['B']))
+		
+		fakeB = GEN_A2B(realA).data
+		fakeA = GEN_B2A(realB).data
 
-###### Testing######
+		IMAGEA = torch.cat([0.5*(realA+1.0), 0.5*(fakeB+1.0)])
+		IMAGEB = torch.cat([0.5*(realB+1.0), 0.5*(fakeA+1.0)])
 
-# Create output dirs if they don't exist
-if not os.path.exists('output/A'):
-    os.makedirs('output/A')
-if not os.path.exists('output/B'):
-    os.makedirs('output/B')
+		save_image(IMAGEA, f'{options["outputpath"]}/A/{batch_id+1}')
+		save_image(IMAGEB, f'{options["outputpath"]}/B/{batch_id+1}')
+		print(f"Generated image {batch_id+1} of {len(dataloader)}")
+	print("DONE!! :D")
 
-for i, batch in enumerate(dataloader):
-    # Set model input
-    real_A = Variable(input_A.copy_(batch['A']))
-    real_B = Variable(input_B.copy_(batch['B']))
-
-    # Generate output
-    fake_B = 0.5*(netG_A2B(real_A).data + 1.0)
-    fake_A = 0.5*(netG_B2A(real_B).data + 1.0)
-
-    # Save image files
-    # print(real_A.shape,fake_A.shape,real_B.shape,fake_B.shape)
-    # break
-    Aimage = torch.cat([0.5*(real_A+1.0),fake_B])
-    Bimage = torch.cat([0.5*(real_B+1.0),fake_A])
-    Aimage = make_grid(Aimage,nrow=2)
-    Bimage = make_grid(Bimage,nrow=2)
-    save_image(Aimage, 'output/A/%04d.png' % (i+1))
-    save_image(Bimage, 'output/B/%04d.png' % (i+1))
-
-    sys.stdout.write('\rGenerated images %04d of %04d' % (i+1, len(dataloader)))
-
-sys.stdout.write('\n')
-###################################
+if __name__=="__main__":
+	tester(options)
