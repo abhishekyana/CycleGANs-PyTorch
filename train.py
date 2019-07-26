@@ -14,7 +14,6 @@ from configure import options #Edit this file to control the parameters once, wi
 
 inH, inW, inC = options["inResolution"]
 outH, outW, outC = options["outResolution"]
-print("HEYYY")
 
 if torch.cuda.is_available():
 	options["cuda"]=True
@@ -30,34 +29,44 @@ def LoadData(path):
 	return dataloader
 
 
+def CycleGANmapper(inC, outC, options, init_weights=True):
+	GA2B = Generator(inC, outC)
+	DB = Discriminator(outC)
+	GB2A = Generator(outC, inC)
+	DA = Discriminator(inC)
+	if options["cuda"]:
+		GA2B.cuda()
+		DB.cuda()
+		GB2A.cuda()
+		DA.cuda()
+	if init_weights:
+		GA2B.apply(weights_init_normal)
+		DB.apply(weights_init_normal)
+		GB2A.apply(weights_init_normal)
+		DA.apply(weights_init_normal)
+		return (GA2B, DB), (GB2A, DA)
+	if options["continued"]:
+		GA2B.load_state_dict(torch.load("output/GEN_AtoB.pth"))
+		DB.load_state_dict(torch.load("output/DIS_B.pth"))
+		GB2A.load_state_dict(torch.load("output/GEN_BtoA.pth"))
+		DA.load_state_dict(torch.load("output/DIS_A.pth"))
+		return (GA2B, DB), (GB2A, DA)
+
+def SaveModels():
+	torch.save(GEN_AtoB.state_dict(), options["outputpath"]+'GEN_AtoB.pth')
+	torch.save(DIS_B.state_dict(), options["outputpath"]+'DIS_B.pth')
+	torch.save(GEN_BtoA.state_dict(), options["outputpath"]+'GEN_BtoA.pth')
+	torch.save(DIS_A.state_dict(), options["outputpath"]+'DIS_A.pth')
+	print(f"Models Saved at {options['outputpath']}")
 
 def trainer(options):
 	startEpoch = options["epoch"]
 	nEpochs = options["nEpochs"]
 	decayEpoch = options["decayEpoch"]
 	assert(nEpochs>decayEpoch), "The decay epoch is larger than total epochs, There will be no decay :P, Sure?"
-	#GAN to map from Generate A to B and Discriminate B
-	GEN_AtoB = Generator(inC, outC)
-	DIS_B = Discriminator(outC)
-	
-	#GAN to map from Generate B to A and Discriminate A
-	GEN_BtoA =  Generator(outC, inC)
-	DIS_A = Discriminator(inC)
-	if options["cuda"]:
-		GEN_AtoB.cuda()
-		DIS_B.cuda()
-		GEN_BtoA.cuda()
-		DIS_A.cuda()
-	GEN_AtoB.apply(weights_init_normal)
-	DIS_B.apply(weights_init_normal)
-	GEN_BtoA.apply(weights_init_normal)
-	DIS_A.apply(weights_init_normal)
-	if options["continued"]:
-		print("continuing from a broken position")
-		GEN_AtoB.load_state_dict(torch.load("output/GEN_AtoB.pth"))
-		DIS_B.load_state_dict(torch.load("output/DIS_B.pth"))
-		GEN_BtoA.load_state_dict(torch.load("output/GEN_BtoA.pth"))
-		DIS_A.load_state_dict(torch.load("output/DIS_A.pth"))
+
+	(GEN_AtoB, DIS_B), (GEN_BtoA, DIS_A) = CycleGANmapper(inC, outC, options)
+
 	# LOSSES
 	GANLoss = torch.nn.MSELoss() # ImageA to ImageB distance
 	CycleLoss = torch.nn.L1Loss() # Absolute loss
@@ -77,7 +86,6 @@ def trainer(options):
 	# Tensors Memory Allocation
 	batchsize = options["batchsize"]
 	if options["cuda"]:
-		print("CUDA-fied")
 		Tensor = torch.cuda.FloatTensor
 	else:
 		Tensor = torch.Tensor
@@ -91,69 +99,84 @@ def trainer(options):
 
 	dataloader = LoadData(options["datapath"])
 	logger = Logger(nEpochs, len(dataloader))
+
 	#Actual Training
 	for epoch in range(startEpoch, nEpochs):
 		for batch_id, batch_data in enumerate(dataloader):
 			realA = Variable(imageA.copy_(batch_data['A']))
 			realB = Variable(imageB.copy_(batch_data['B']))
 
+			# Generator GEN_AtoB mapping from A to B and GEN_BtoA mapping from B to A
 			optim_GAN.zero_grad()
 
+			#Identity Loss: GEN_AtoB(realB) should generate B
 			synthB = GEN_AtoB(realB)
 			lossIden_BtoB = IdentityLoss(synthB, realB)*5.0
 
+			#Identity Loss: GEN_BtoA(realA) should generate A
 			synthA = GEN_BtoA(realA)
 			lossIden_AtoA = IdentityLoss(synthA, realA)*5.0
 
+			#GAN Loss: DIS_B(GEN_AtoB(realA)) should be closest to real target.
 			fakeB = GEN_AtoB(realA)
 			classB = DIS_B(fakeB)
 			lossGEN_A2B = GANLoss(classB, targetReal)
 
+			#GAN Loss: DIS_A(GEN_BtoA(realB)) should be closest to real target.
 			fakeA = GEN_BtoA(realB)
 			classA = DIS_A(fakeA)
 			lossGEN_B2A = GANLoss(classA, targetReal)
 
+			#Cycle Recontruction: GEN_BtoA(GEN_AtoB(realA)) -> realA should give realA
 			reconA = GEN_BtoA(fakeB)
 			lossCycle_ABA = CycleLoss(reconA, realA)*10.0
 
+			#Cycle Recontruction: GEN_AtoB(GEN_BtoA(realB)) -> realB should give realA
 			reconB = GEN_BtoA(fakeA)
 			lossCycle_BAB = CycleLoss(reconB, realB)*10.0
 
+			# Total Loss of the GANSs, Cycle Consistancy Loss
 			lossTotal = lossCycle_BAB + lossCycle_ABA + lossGEN_B2A + lossGEN_A2B + lossIden_AtoA + lossIden_BtoB
 			lossTotal.backward()
 
 			optim_GAN.step()
-			# Discriminator A
+
+			# Discriminator A Updatation part
 			optim_DIS_A.zero_grad()
 
+			#Real Loss: When a realA is sent into the Discriminator should predict 1.0
 			classAreal = DIS_A(realA)
 			lossDreal = GANLoss(classAreal, targetReal)
 
-			fakeA = FakeAHolder.push_and_pop(fakeA)
+			#Fake Loss: When a fakeA is sent into the Discriminator should predict 0.0
+			fakeA = FakeAHolder.push_and_pop(fakeA) # For logging
 			classAfake = DIS_A(fakeA.detach())
 			lossDfake = GANLoss(classAfake, targetFake)
 
+			# The Discriminator should perfrom equally good at both the tasks
 			lossDA = (lossDreal + lossDfake)/2
 
 			lossDA.backward()
-
 			optim_DIS_A.step()
 
-			# Discriminator B
+			# Discriminator B Updatation part
 			optim_DIS_B.zero_grad()
 
+			#Real Loss: When a realB is sent into the Discriminator should predict 1.0
 			classBreal = DIS_B(realB)
 			lossDreal = GANLoss(classBreal, targetReal)
 
-			fakeB = FakeBHolder.push_and_pop(fakeB)
+			#Fake Loss: When a fakeB is sent into the Discriminator should predict 0.0
+			fakeB = FakeBHolder.push_and_pop(fakeB) # For logging
 			classBfake = DIS_B(fakeB.detach())
 			lossDfake = GANLoss(classBfake, targetFake)
+
+			# The Discriminator should perfrom equally good at both the tasks
 			lossDB = (lossDreal + lossDfake)/2
 
 			lossDB.backward()
-
 			optim_DIS_B.step()
-			# Progress report (http://localhost:8097)
+			#Progress
 			logger.log({'lossTotal': lossTotal, 'lossIdentity': (lossIden_AtoA + lossIden_BtoB), 'lossGAN': (lossGEN_A2B + lossGEN_B2A),
 					'lossCycle': (lossCycle_ABA + lossCycle_BAB), 'lossD': (lossDA + lossDB)}, 
 					images={'realA': realA, 'realB': realB, 'fakeA': fakeA, 'fakeB': fakeB})
@@ -164,15 +187,11 @@ def trainer(options):
 		lr_scheduler_Dis_B.step()
 
 		# Save Models checkpoints
-		torch.save(GEN_AtoB.state_dict(), options["outputpath"]+'GEN_AtoB.pth')
-		torch.save(DIS_B.state_dict(), options["outputpath"]+'DIS_B.pth')
-		torch.save(GEN_BtoA.state_dict(), options["outputpath"]+'GEN_BtoA.pth')
-		torch.save(DIS_A.state_dict(), options["outputpath"]+'DIS_A.pth')
+		SaveModels(GEN_AtoB, DIS_B, GEN_BtoA, DIS_A)
 		with open("EpochVerify.txt",'w') as ff:
 			ff.write("\n"+str(epoch))
 
 
 
 if __name__=="__main__":
-	print("Starting the training")
 	trainer(options)
