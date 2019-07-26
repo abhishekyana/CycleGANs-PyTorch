@@ -12,3 +12,14 @@ options = {
 			"nThreads":10,
 			"unpaired":True,
 		   }
+
+testoptions = {
+				"batchsize": 1,
+				"datapath": './young2old',
+				"outputpath":'./output/',
+				"inResolution":[256, 256, 3],
+				"outResolution":[256, 256, 3],
+				"nThreads":10,
+				"GEN_AtoB":'./output/GEN_AtoB.pth',
+				"GEN_BtoA":'./output/GEN_BtoA.pth'
+			  }
