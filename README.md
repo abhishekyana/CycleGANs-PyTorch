@@ -16,7 +16,12 @@ cd CycleGANs-PyTorch
 1. Install all the requirements from requirements.txt file:
 1. Download the dataset, It can be grabbed from [here](https://www.kaggle.com/abhishekyana/young2old-dataset).
 1. Unzip and Move the dataset folder into this project's root directory.
-
+1. Adjust the configure.py file according to your flavour, these parameters affect the training.
+1. Run the `python train.py` file and see the training happen for yourself.
+* The models will be saved to and loaded from ./outputs as default.
+* The model trained for around 4 hours on GTX1080 and i7 system.
+### Please Feel Free to Fork it, Clone it and whatever you want.
+* Not only this data, A CycleGAN can map from any unpaired domains, as this application si trending now, I've chosen this to code. 
 
 ### Thank you
 This project is inspired from [Aitor Ruano](https://github.com/aitorzip) and I would like to thank him for providing such a beautiful code which I used to clarify my doubts during the implementation.
