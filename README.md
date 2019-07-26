@@ -25,8 +25,8 @@ cd CycleGANs-PyTorch
 * Download the dataset.
 * Download the pretrained model. Only Generator model is enough.
 * Copy these folders into appropriate directories as mentioned above.
-* Run `python test.py`, After the provess is done, you can see the Juxtaposed results in ./outputs/A and ./outputs/B.
-* If you want to run this on your own images, Copy your image into a directory in ./directory/A if you want to make your picture old or into ./directory/B if you want your picture to be Young. Then edit the ./directory in testoptions in configure.py and run the code again. Now, you can see the your image in the outputs directory.
+* Run `python test.py`, After the provess is done, you can see the Juxtaposed results in `./outputs/A` and `./outputs/B`.
+* If you want to run this on your own images, Copy your image into a directory in `./directory/A` if you want to make your picture old or into `./directory/B` if you want your picture to be Young. Then edit the `./directory` in testoptions in `configure.py` and run the code again. Now, you can see the your image in the outputs directory.
 
 ### Please Feel Free to Fork it, Clone it and whatever you want.
 * Not only this data, A CycleGAN can map from any unpaired domains, as this application si trending now, I've chosen this to code. 
