@@ -21,7 +21,7 @@ cd CycleGANs-PyTorch
 * The models will be saved to and loaded from ./outputs as default.
 * The model trained for around 4 hours on GTX1080 and i7 system.
 
-### If you want to test the mode, then you can download the pretrained model [from here](http://blog.abhishekyana.ml).
+### If you want to test the mode, then you can download the pretrained model [from here](./). Sorry the link is broken I'll fix it..
 * Download the dataset.
 * Download the pretrained model. Only Generator model is enough.
 * Copy these folders into appropriate directories as mentioned above.
