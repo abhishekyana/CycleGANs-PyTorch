@@ -1,5 +1,5 @@
 # CycleGANs-PyTorch applied on Young to Old image converter.
-Py-Torch implementation of [CycleGAN](https://arxiv.org/pdf/1703.10593.pdf).
+Py-Torch implementation of [CycleGANs Paper](https://arxiv.org/pdf/1703.10593.pdf).
 * You can find more about this project in my [blog here](http://blog.abhishekyana.ml/implement-your-own-young-to-old-age-converter-app-in-pytorch-using-cyclegans/).
 ### RESULTS FIRST: Young to Old converter
 ![img1.jpg](./results/A/0166.png)
