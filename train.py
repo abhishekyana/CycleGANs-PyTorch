@@ -67,10 +67,10 @@ def trainer(options):
 
 	(GEN_AtoB, DIS_B), (GEN_BtoA, DIS_A) = CycleGANmapper(inC, outC, options)
 
-	# LOSSES
+	# LOSSES 
 	GANLoss = torch.nn.MSELoss() # ImageA to ImageB distance
-	CycleLoss = torch.nn.L1Loss() # Absolute loss
-	IdentityLoss  = torch.nn.L1Loss() # ImageA->ImageB->ImageA' distance
+	CycleLoss = torch.nn.L1Loss() # ImageA->ImageB->ImageA' distance
+	IdentityLoss  = torch.nn.L1Loss() # Absolute loss
 
 	optim_GAN = torch.optim.Adam(list(GEN_AtoB.parameters())+list(GEN_BtoA.parameters()), lr=options["learningrate"], betas=[0.5, 0.999])
 	optim_DIS_A = torch.optim.Adam(DIS_A.parameters(), lr=options["learningrate"], betas=[0.5, 0.999])
