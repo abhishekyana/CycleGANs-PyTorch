@@ -58,9 +58,9 @@ class Generator(nn.Module):
     	return out
 
 class Discriminator(nn.Module):
-	def __init__(self, inputnc):
-		super(Discriminator, self).__init__()
-		layers = [nn.Conv2d(inputnc, 64, 4, stride=2, padding=1),
+    def __init__(self, inputnc):
+	super(Discriminator, self).__init__()
+	layers = [nn.Conv2d(inputnc, 64, 4, stride=2, padding=1),
                   nn.LeakyReLU(0.2, inplace=True),
                   nn.Conv2d(64, 128, 4, stride=2, padding=1),
                   nn.InstanceNorm2d(128),
